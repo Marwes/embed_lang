@@ -13,6 +13,7 @@ let { Monoid, empty } = import! std.monoid
 let { Group } = import! std.group
 let { Eq, Ord, Bool, Ordering, (==), (/=), (<), (<=), (>=), (>) } = import! std.cmp
 let { Show, show } = import! std.show
+let { Display, display } = import! std.display
 let { Category, id, compose } = import! std.category
 let { Num, (+), (-), (*), (/), negate } = import! std.num
 let { Bool, not } = import! std.bool
@@ -64,6 +65,9 @@ let { (<|) } = import! std.function
 
     Show,
     show,
+
+    Display,
+    display,
 
     Option,
     Bool,

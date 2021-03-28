@@ -49,6 +49,7 @@ pub mod compiler_pipeline;
 #[macro_use]
 pub mod import;
 pub mod lift_io;
+pub mod format_macro;
 #[doc(hidden)]
 pub mod query;
 pub mod std_lib;
@@ -961,6 +962,8 @@ impl VmBuilder {
             }
 
             macros.insert(String::from("lift_io"), lift_io::LiftIo);
+
+            macros.insert(String::from("format"), format_macro::Format);
         }
 
         add_extern_module_with_deps(

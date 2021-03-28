@@ -7,6 +7,7 @@ let { Group } = import! std.group
 let { Eq, Ord, Ordering } = import! std.cmp
 let { Num } = import! std.num
 let { Show } = import! std.show
+let { Display } = import! std.display
 
 let additive =
     let semigroup : Semigroup Int = {
@@ -59,6 +60,10 @@ let show : Show Int = {
     show = (import! std.prim).show_int,
 }
 
+let display : Display Int = {
+    display = (import! std.prim).show_int,
+}
+
 {
     additive,
     multiplicative,
@@ -66,6 +71,7 @@ let show : Show Int = {
     ord,
     num,
     show,
+    display,
     ..
     import! std.int.prim
 }

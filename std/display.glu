@@ -1,0 +1,22 @@
+//@NO-IMPLICIT-PRELUDE
+//! Value to string conversion, intended for strings passed to users.
+
+/// `Display a` represents a conversion function from `a` to a pretty string.
+#[implicit]
+type Display a = { display : a -> String }
+
+/// Converts a value into a string.
+/// ```
+/// let { ? } = import! std.effect
+/// let { assert_eq, ? } = import! std.test
+///
+/// seq assert_eq (display 123) "123"
+/// seq assert_eq (display 3.14) "3.14"
+/// assert_eq (display "abc") "abc"
+/// ```
+let display ?d : [Display a] -> a -> String = d.display
+
+{
+    Display,
+    display,
+}

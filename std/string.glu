@@ -6,6 +6,7 @@ let prim = import! std.prim
 let { Semigroup, (<>) } = import! std.semigroup
 let { Monoid } = import! std.monoid
 let { Show } = import! std.show
+let { Display } = import! std.display
 let { Eq, Ord, Ordering } = import! std.cmp
 let function = import! std.function
 
@@ -25,10 +26,13 @@ let ord : Ord String = { eq, compare = prim.string_compare }
 
 let show : Show String = { show = \s -> "\"" ++ s ++ "\"" }
 
+let display : Display String = { display = \s -> s }
+
 {
     eq,
     ord,
     show,
+    display,
     semigroup,
     monoid,
     (++),
