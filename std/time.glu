@@ -1,0 +1,17 @@
+//! Time-related functionality
+let duration = import! std.time.duration
+let instant = import! std.time.instant
+let system_time = import! std.time.system_time
+
+{
+    duration,
+    instant,
+    system_time,
+
+    duration_eq = duration.eq,
+    duration_ord = duration.ord,
+    instant_eq = instant.eq,
+    instant_ord = instant.ord,
+    system_time_eq = system_time.eq,
+    system_time_ord = system_time.ord,
+}

@@ -1018,6 +1018,7 @@ impl VmBuilder {
             ("std.debug.prim", crate::vm::debug::load),
             ("std.process.prim", crate::std_lib::process::load),
             ("std.env.prim", crate::std_lib::env::load),
+            ("std.time.prim", crate::std_lib::time::load),
         ];
         for (name, load_fn) in deps {
             add_extern_module(&vm, name, load_fn);

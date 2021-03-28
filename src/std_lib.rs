@@ -7,3 +7,4 @@ pub mod process;
 pub mod random;
 #[cfg(feature = "regex")]
 pub mod regex;
+pub mod time;

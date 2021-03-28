@@ -1,0 +1,400 @@
+//! A `Duration` type for representing and working with spans of time
+// Documentation in this module is mostly modified from Rust's std::time crate.
+
+let { Eq, Ord, Ordering } = import! std.cmp
+let { duration } = import! std.time.prim
+let { Duration } = duration
+
+let eq : Eq Duration = {(==) = duration.eq}
+
+let ord : Ord Duration =
+    let compare x y =
+        if duration.eq x y then
+            EQ
+        else if duration.lt x y then
+            LT
+        else
+            GT
+
+    {eq, compare}
+
+{
+    /// A `Duration` represents a span of time.
+    ///
+    /// Each `Duration` is composed of a whole number of seconds and a fractional part
+    /// represented in nanoseconds. If the underlying system does not support
+    /// nanosecond-level precision, APIs binding a system timeout will typically round
+    /// up the number of nanoseconds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { (|>) } = import! std.function
+    /// let { map } = import! std.functor
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, ? } = import! std.test
+    /// let { duration } = import! std.time
+    ///
+    /// let five_seconds = duration.from_secs 5
+    ///
+    /// seq assert_eq 5 (duration.as_secs five_seconds)
+    /// seq assert_eq 0 (duration.subsec_nanos five_seconds)
+    /// assert_eq (Some 10)
+    ///           (duration.checked_add five_seconds five_seconds |> map duration.as_secs)
+    /// ```
+    Duration,
+
+    /// Creates a new `Duration` from the specified number of whole seconds and
+    /// additional nanoseconds.
+    ///
+    /// If the number of nanoseconds is 1 billion (the number of nanoseconds in a
+    /// second) or greater, then it will carry over into the seconds provided.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the specified number of seconds or nanoseconds are
+    /// negative.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { wrap } = import! std.applicative
+    /// let { ? } = import! std.effect
+    /// let { duration } = import! std.time
+    ///
+    /// let five_and_a_half_seconds = duration.new 5 500000000
+    /// let one_tenth_of_a_second = duration.new 0 100000000
+    /// wrap ()
+    /// ```
+    new = duration.new,
+
+    /// Creates a new `Duration` from the specified number of whole seconds.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the specified number of seconds is negative.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, ? } = import! std.test
+    /// let { duration, ? } = import! std.time
+    ///
+    /// let five_seconds = duration.from_secs 5
+    ///
+    /// seq assert_eq 5 (duration.as_secs five_seconds)
+    /// assert_eq 0 (duration.subsec_nanos five_seconds)
+    /// ```
+    from_secs = duration.from_secs,
+
+    /// Creates a new `Duration` from the specified number of whole milliseconds.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the specified number of milliseconds is negative.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, ? } = import! std.test
+    /// let { duration, ? } = import! std.time
+    ///
+    /// let two_and_a_half_seconds = duration.from_millis 2500
+    ///
+    /// seq assert_eq 2 (duration.as_secs two_and_a_half_seconds)
+    /// assert_eq 500000000 (duration.subsec_nanos two_and_a_half_seconds)
+    /// ```
+    from_millis = duration.from_millis,
+
+    /// Creates a new `Duration` from the specified number of whole microseconds.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the specified number of microseconds is negative.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, ? } = import! std.test
+    /// let { duration } = import! std.time
+    ///
+    /// let one_and_a_little_seconds = duration.from_micros 1000002
+    ///
+    /// seq assert_eq 1 (duration.as_secs one_and_a_little_seconds)
+    /// assert_eq 2000 (duration.subsec_nanos one_and_a_little_seconds)
+    /// ```
+    from_micros = duration.from_micros,
+
+    /// Creates a new `Duration` from the specified number of whole nanoseconds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, ? } = import! std.test
+    /// let { duration } = import! std.time
+    ///
+    /// let four_and_a_half_seconds = duration.from_nanos 4500000000
+    ///
+    /// seq assert_eq 4 (duration.as_secs four_and_a_half_seconds)
+    /// assert_eq 500000000 (duration.subsec_nanos four_and_a_half_seconds)
+    /// ```
+    from_nanos = duration.from_nanos,
+
+    /// Returns the number of *whole* seconds contained by this `Duration`.
+    ///
+    /// The returned value does not include the fractional (nanosecond) part of the
+    /// duration, which can be obtained using `subsec_nanos`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the resultant number of seconds is greater than
+    /// `int.max_value`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, ? } = import! std.test
+    /// let { duration } = import! std.time
+    ///
+    /// let dur = duration.new 5 730023852
+    ///
+    /// assert_eq 5 (duration.as_secs dur)
+    /// ```
+    ///
+    /// To determine the total number of seconds represented by the `Duration`,
+    /// use `as_secs` in combination with `subsec_nanos`:
+    ///
+    /// ```
+    /// let float = import! std.float
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, ? } = import! std.test
+    /// let { duration } = import! std.time
+    ///
+    /// let dur = duration.new 5 730023852
+    ///
+    /// assert_eq 5.730023852
+    ///           (float.from_int (duration.as_secs dur)
+    ///            + float.from_int (duration.subsec_nanos dur) * 0.000000001)
+    /// ```
+    as_secs = duration.as_secs,
+
+    /// Returns the fractional part of this `Duration`, in whole milliseconds.
+    ///
+    /// This method does **not** return the length of the duration when
+    /// represented by milliseconds. The returned number always represents a
+    /// fractional portion of a second (i.e. it is always less than one thousand).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, ? } = import! std.test
+    /// let { duration } = import! std.time
+    ///
+    /// let dur = duration.from_millis 5432
+    ///
+    /// seq assert_eq 5 (duration.as_secs dur)
+    /// assert_eq 432 (duration.subsec_millis dur)
+    /// ```
+    subsec_millis = duration.subsec_millis,
+
+    /// Returns the fractional part of this `Duration`, in whole microseconds.
+    ///
+    /// This method does **not** return the length of the duration when
+    /// represented by microseconds. The returned number always represents a
+    /// fractional portion of a second (i.e. it is always less than one million).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, ? } = import! std.test
+    /// let { duration } = import! std.time
+    ///
+    /// let dur = duration.from_micros 1234567
+    ///
+    /// seq assert_eq 1 (duration.as_secs dur)
+    /// assert_eq 234567 (duration.subsec_micros dur)
+    /// ```
+    subsec_micros = duration.subsec_micros,
+
+    /// Returns the fractional part of this `Duration`, in whole nanoseconds.
+    ///
+    /// This method does **not** return the length of the duration when
+    /// represented by microseconds. The returned number always represents a
+    /// fractional portion of a second (i.e. it is always less than one billion).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, ? } = import! std.test
+    /// let { duration } = import! std.time
+    ///
+    /// let dur = duration.from_millis 5432
+    ///
+    /// seq assert_eq 5 (duration.as_secs dur)
+    /// assert_eq 432000000 (duration.subsec_nanos dur)
+    /// ```
+    subsec_nanos = duration.subsec_nanos,
+
+    /// Returns the total number of whole milliseconds contained by this `Duration`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the resultant number of milliseconds is greater
+    /// than `int.max_value`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, ? } = import! std.test
+    /// let { duration } = import! std.time
+    ///
+    /// let dur = duration.new 3 141592653
+    ///
+    /// assert_eq 3141 (duration.as_millis dur)
+    /// ```
+    as_millis = duration.as_millis,
+
+    /// Returns the total number of whole microseconds contained by this `Duration`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the resultant number of microseconds is greater
+    /// than `int.max_value`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, ? } = import! std.test
+    /// let { duration } = import! std.time
+    ///
+    /// let dur = duration.new 3 141592653
+    ///
+    /// assert_eq 3141592 (duration.as_micros dur)
+    /// ```
+    as_micros = duration.as_micros,
+
+    /// Returns the total number of nanoseconds contained by this `Duration`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the resultant number of nanoseconds is greater
+    /// than `int.max_value`
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, ? } = import! std.test
+    /// let { duration } = import! std.time
+    ///
+    /// let dur = duration.new 3 141592653
+    ///
+    /// assert_eq 3141592653 (duration.as_nanos dur)
+    /// ```
+    as_nanos = duration.as_nanos,
+
+    /// Checked `Duration` addition. Computes `x + y`, returning `None` if overflow
+    /// occurred.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let int = import! std.int
+    /// let { const } = import! std.function
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, assert_none, ? } = import! std.test
+    /// let { duration, ? } = import! std.time
+    ///
+    /// let dur_x = duration.new 3 500000000
+    /// let dur_y = duration.new 5 250000000
+    /// let dur_max = duration.new int.max_value int.max_value
+    ///
+    /// let dur_show : Show duration.Duration = { show = const "<duration>" }
+    ///
+    /// seq assert_eq (Some (duration.new 8 750000000))
+    ///               (duration.checked_add dur_x dur_y)
+    /// assert_none (duration.checked_add dur_max dur_max)
+    /// ```
+    checked_add = duration.checked_add,
+
+    /// Checked `Duration` subtraction. Computes `x - y`, returning `None` if the
+    /// result would be negative.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { const } = import! std.function
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, assert_none, ? } = import! std.test
+    /// let { duration, ? } = import! std.time
+    ///
+    /// let dur_show : Show duration.Duration = { show = const "<duration>" }
+    ///
+    /// let dur_small = duration.new 3 500000000
+    /// let dur_big = duration.new 5 250000000
+    ///
+    /// seq assert_eq (Some (duration.new 1 750000000))
+    ///               (duration.checked_sub dur_big dur_small)
+    /// assert_none (duration.checked_sub dur_small dur_big)
+    /// ```
+    checked_sub = duration.checked_sub,
+
+    /// Checked multiplication of a `Duration` by an integer. Computes `dur * n`,
+    /// returning `None` if `n` is negative or overflow occurred.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let int = import! std.int
+    /// let { const } = import! std.function
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, assert_none, ? } = import! std.test
+    /// let { duration, ? } = import! std.time
+    ///
+    /// let dur_show : Show duration.Duration = { show = const "<duration>" }
+    ///
+    /// let dur = duration.new 3 500000000
+    /// let dur_max = duration.new int.max_value 250000000
+    ///
+    /// seq assert_eq (Some (duration.new 17 500000000))
+    ///               (duration.checked_mul dur 5)
+    /// seq assert_eq None
+    ///               (duration.checked_mul dur -5)
+    /// assert_none (duration.checked_mul dur_max 5)
+    /// ```
+    checked_mul = duration.checked_mul,
+
+    /// Checked division of a `Duration` by an integer. Computes `dur / n`,
+    /// returning `None` if `n == 0` or `n` is negative.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { const } = import! std.function
+    /// let { ? } = import! std.effect
+    /// let { assert_eq, assert_none, ? } = import! std.test
+    /// let { duration, ? } = import! std.time
+    ///
+    /// let dur_show : Show duration.Duration = { show = const "<duration>" }
+    ///
+    /// let dur = duration.new 3 500000000
+    ///
+    /// seq assert_eq (Some (duration.new 1 750000000))
+    ///               (duration.checked_div dur 2)
+    /// assert_none (duration.checked_div dur 0)
+    /// ```
+    checked_div = duration.checked_div,
+
+    eq,
+    ord,
+}

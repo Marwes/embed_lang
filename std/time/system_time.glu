@@ -1,0 +1,205 @@
+//! A measurement of the system clock. Not as consistent as `Instant`, but can represent a specific moment in history.
+// Documentation in this module is mostly modified from Rust's std::time crate.
+
+let { Ordering } = import! std.types
+let { Eq, Ord } = import! std.cmp
+let { system_time } = import! std.time.prim
+let { SystemTime } = system_time
+
+let eq : Eq SystemTime = {(==) = system_time.eq}
+
+let ord : Ord SystemTime =
+    let compare x y =
+        if system_time.eq x y then
+            EQ
+        else if system_time.lt x y then
+            LT
+        else
+            GT
+
+    {eq, compare}
+
+{
+    /// A measurement of the system clock, useful for talking to external
+    /// entities like the file system or other processes.
+    ///
+    /// Distinct from the `Instant` type, this time measurement **is not
+    /// monotonic**. This means that you can save a file to the file system,
+    /// then save another file to the file system, **and the second file have a
+    /// `SystemTime` measurement earlier than the first**. In other words, an
+    /// operation that happens after another operation in real time may have an
+    /// earlier `SystemTime`!
+    ///
+    /// Although a `SystemTime` cannot be directly inspected, the `unix_epoch`
+    /// constant is provided in this module as an anchor in time to learn
+    /// information about a `SystemTime`. By calculating the duration from this
+    /// fixed point in time, a `SystemTime` can be converted to a human-readable
+    /// time, or perhaps some other string representation.
+    SystemTime,
+
+    /// A `SystemTime` representing the date 1970-01-01 00:00:00 UTC. Using
+    /// `duration_since unix_epoch` on an existing `SystemTime` instance
+    /// can tell how far away from this point in time a measurement
+    /// lies, and using `checked_add unix_epoch duration` can be used to create
+    /// a `SystemTime` instance to represent another fixed point in time.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { (<|), (<<) } = import! std.function
+    /// let { wrap } = import! std.applicative
+    /// let { Result, ? } = import! std.result
+    /// let { ? } = import! std.effect
+    /// let { lift, ? } = import! std.effect.lift
+    /// let { println, ? } = import! std.io
+    /// let { system_time, duration, ? } = import! std.time
+    /// 
+    /// do this_moment = lift system_time.now
+    /// let diff = system_time.duration_since system_time.unix_epoch this_moment
+    /// // match diff with
+    /// // | Ok  x -> lift <| println <| "1970-01-01 00:00:00 UTC was "
+    /// //                               ++ (show << duration.as_secs) x
+    /// //                               ++ " seconds ago!"
+    /// // | Err _ -> lift <| println "SystemTime before UNIX EPOCH!"
+    /// wrap ()
+    /// ```
+    unix_epoch = system_time.unix_epoch,
+
+    /// Returns a `SystemTime` corresponding to "now".
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { (<|) } = import! std.function
+    /// let { wrap } = import! std.applicative
+    /// let int = import! std.int
+    /// let array = import! std.array
+    /// let { unwrap_ok_or } = import! std.result
+    /// let { ? } = import! std.effect
+    /// let { lift, ? } = import! std.effect.lift
+    /// let { println, ? } = import! std.io
+    /// let { system_time, duration, ? } = import! std.time
+    /// 
+    /// let dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    /// do this_moment = lift system_time.now
+    /// let diff = unwrap_ok_or (duration.from_secs 0) (system_time.duration_since system_time.unix_epoch this_moment)
+    /// let days = duration.as_secs diff / 60 / 60 / 24
+    /// // lift <| println ("It is currently " ++ array.index dow (int.rem (4 + days) 7) ++ " in Greenwich")
+    /// wrap ()
+    /// ```
+    now = system_time.now,
+
+    /// Returns `Ok duration` where `duration` is the amount of time elapsed
+    /// between the first `SystemTime` and the second `SystemTime`, or `Err duration`
+    /// if the second `SystemTime` is earlier than the first. (The order of the
+    /// parameters is flipped relative to the Rust standard library function.)
+    ///
+    /// This function may error because measurements taken earlier are not
+    /// guaranteed to always be before later measurements (due to anomalies such
+    /// as the system clock being adjusted either forwards or backwards).
+    /// `Instant` can be used to measure elapsed time without this risk of failure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { (<|), (<<) } = import! std.function
+    /// let { wrap } = import! std.applicative
+    /// let { Result } = import! std.result
+    /// let { ? } = import! std.effect
+    /// let { lift, ? } = import! std.effect.lift
+    /// let { println, ? } = import! std.io
+    /// let { system_time, duration, ? } = import! std.time
+    ///                                                            
+    /// do moment1 = lift system_time.now
+    /// do moment2 = lift system_time.now
+    /// // match system_time.duration_since moment1 moment2 with
+    /// // | Ok  dur -> lift <| println <| "moment1 occurred "
+    /// //                                 ++ (show << duration.as_nanos) dur
+    /// //                                 ++ " ns before moment2"
+    /// // | Err dur -> lift <| println <| "moment1 seems to have occurred "
+    /// //                                 ++ (show << duration.as_nanos) dur
+    /// //                                 ++ " ns AFTER moment2"
+    /// wrap ()
+    /// ```
+    duration_since = system_time.duration_since,
+
+    /// Returns the amount of time elapsed between the first system time and the second,
+    /// or a duration of zero if the second system time is earlier than the first. (The order of the
+    /// parameters is flipped relative to the Rust standard library function.)
+    saturating_duration_since = system_time.saturating_duration_since,
+
+    /// Returns `Ok duration` where `duration` is the amount of time elapsed
+    /// since the given `SystemTime` was created, or `Err duration` if the given
+    /// `SystemTime` is earlier than the current time. (The order of the
+    /// parameters is flipped relative to the Rust standard library function.)
+    ///
+    /// This function may error because measurements taken earlier are not
+    /// guaranteed to always be before later measurements (due to anomalies such
+    /// as the system clock being adjusted either forwards or backwards).
+    /// `Instant` can be used to measure elapsed time without this risk of failure.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { (<|), (<<) } = import! std.function
+    /// let { wrap } = import! std.applicative
+    /// let { Result } = import! std.result
+    /// let { ? } = import! std.effect
+    /// let { lift, ? } = import! std.effect.lift
+    /// let { println, ? } = import! std.io
+    /// let { system_time, duration, ? } = import! std.time
+    ///                                                            
+    /// do moment = lift system_time.now
+    /// do diff = lift <| system_time.elapsed moment
+    /// // match diff with
+    /// // | Ok  dur -> lift <| println <| "moment occurred "
+    /// //                                 ++ (show << duration.as_nanos) dur
+    /// //                                 ++ " ns ago"
+    /// // | Err dur -> lift <| println <| "moment apparently will occur in "
+    /// //                                 ++ (show << duration.as_nanos) dur
+    /// //                                 ++ " ns"
+    /// wrap ()
+    /// ```
+    elapsed = system_time.elapsed,
+
+    /// Returns `Some t` where `t` is the time `moment + duration` if `t` can be
+    /// represented as an `SystemTime` (which means it's inside the bounds of the
+    /// underlying data structure) and `None` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { (<|) } = import! std.function
+    /// let { assert_some, ? } = import! std.test
+    /// let { ? } = import! std.effect
+    /// let { lift, ? } = import! std.effect.lift
+    /// let { ? } = import! std.io
+    /// let { system_time, duration, ? } = import! std.time
+    ///
+    /// do moment = lift system_time.now
+    /// assert_some <| system_time.checked_add moment (duration.from_secs 3)
+    /// ```
+    checked_add = system_time.checked_add,
+
+    /// Returns `Some t` where `t` is the time `moment - duration` if `t` can be
+    /// represented as an `SystemTime` (which means it's inside the bounds of the
+    /// underlying data structure) and `None` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let { (<|) } = import! std.function
+    /// let { assert_some, ? } = import! std.test
+    /// let { ? } = import! std.effect
+    /// let { lift, ? } = import! std.effect.lift
+    /// let { ? } = import! std.io
+    /// let { system_time, duration, ? } = import! std.time
+    ///
+    /// do moment = lift system_time.now
+    /// assert_some <| system_time.checked_sub moment (duration.from_secs 3)
+    /// ```
+    checked_sub = system_time.checked_sub,
+
+    eq,
+    ord,
+}
