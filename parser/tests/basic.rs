@@ -10,6 +10,7 @@ use crate::support::*;
 
 use crate::base::{
     ast::*,
+    kind::Kind,
     metadata::*,
     mk_ast_arena,
     pos::{self, BytePos, Span, Spanned},
@@ -129,7 +130,14 @@ test_parse! {
     type Test2 = { x: Int, y: {} }
     in 1"#,
     |mut arena| {
-        let test = arena.clone().variant(arena.alloc_extend(vec![Field::ctor_with(&mut arena.clone(), intern("Test").into(), vec![typ(arena, "Int")])]));
+        let test = arena.clone().variant(arena.alloc_extend(vec![
+                Field::ctor_with(
+                    &mut arena.clone(),
+                    TypedIdent { name: intern("Test"), typ: Kind::typ() },
+                    intern("Test").into(),
+                    vec![typ(arena, "Int")],
+                ),
+        ]));
         let test2 = arena.record(
             Default::default(),
             arena.alloc_extend(vec![
@@ -216,8 +224,8 @@ test_parse! {
             intern("Option"),
             vec![generic("a")],
             arena.clone().variant(arena.alloc_extend(vec![
-                Field::ctor_with(&mut arena.clone(), intern("None").into(), vec![]),
-                Field::ctor_with(&mut arena.clone(), intern("Some").into(), vec![typ(arena, "a")]),
+                Field::ctor_with(&mut arena.clone(), TypedIdent { name: intern("Option"), typ: Kind::typ() }, intern("None").into(), vec![]),
+                Field::ctor_with(&mut arena.clone(), TypedIdent { name: intern("Option"), typ: Kind::typ() }, intern("Some").into(), vec![typ(arena, "a")]),
             ])),
             app(arena, id("Some"), vec![int(1)]),
         )

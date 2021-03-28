@@ -127,7 +127,7 @@ in Test2 (\x -> x #Int+ 2)
     let test2 = AliasData::new(
         intern("Test2"),
         vec![],
-        Type::variant(vec![support::variant("Test2", &[typ("Test")])]),
+        Type::variant(vec![support::variant("Test2", "Test2", &[typ("Test")])]),
     );
     let expected = Ok(Alias::group(vec![test, test2])[1].as_type().clone());
 
@@ -536,7 +536,11 @@ fn type_pattern() {
 type Test = | Test String Int in { Test, x = 1 }
 "#;
     let result = support::typecheck(text);
-    let test = Type::variant(vec![support::variant("Test", &[typ("String"), typ("Int")])]);
+    let test = Type::variant(vec![support::variant(
+        "Test",
+        "Test",
+        &[typ("String"), typ("Int")],
+    )]);
     let types = vec![Field {
         name: support::intern_unscoped("Test"),
         typ: Alias::new(intern("Test"), Vec::new(), test),

@@ -860,6 +860,7 @@ impl<SpId, T> Field<SpId, T> {
 
     pub fn ctor_with<J, Id>(
         context: &mut (impl TypeContext<Id, T> + ?Sized),
+        enum_type: KindedIdent<Id>,
         ctor_name: SpId,
         elems: J,
     ) -> Self
@@ -868,22 +869,22 @@ impl<SpId, T> Field<SpId, T> {
         J::IntoIter: DoubleEndedIterator,
         T: TypePtr<Id = Id>,
     {
-        let opaque = context.opaque();
-        let typ = context.function_type(ArgType::Constructor, elems, opaque);
+        let enum_type = context.ident(enum_type);
+        let typ = context.function_type(ArgType::Constructor, elems, enum_type);
         Field {
             name: ctor_name,
             typ,
         }
     }
 
-    pub fn ctor<J, Id>(ctor_name: SpId, elems: J) -> Self
+    pub fn ctor<J, Id>(enum_type: KindedIdent<Id>, ctor_name: SpId, elems: J) -> Self
     where
         J: IntoIterator<Item = T>,
         J::IntoIter: DoubleEndedIterator,
         T: TypeExt<Id = Id> + From<Type<Id, T>>,
         T::Types: Default + Extend<T>,
     {
-        let typ = Type::function_type(ArgType::Constructor, elems, Type::opaque());
+        let typ = Type::function_type(ArgType::Constructor, elems, Type::ident(enum_type));
         Field {
             name: ctor_name,
             typ,

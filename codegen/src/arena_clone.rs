@@ -72,21 +72,21 @@ fn gen_impl(container: &Container, ident: Ident, generics: Generics, data: &Data
         },
         Data::Enum(ref enum_) => {
             let variants = enum_.variants.iter().map(|variant| {
-                let ident = variant.ident.to_string();
+                let variant_ident = variant.ident.to_string();
                 match variant.fields {
                     Fields::Named(ref fields) => {
                         let fields = fields.named.iter().map(|field| {
-                            let ident = field.ident.as_ref().unwrap().to_string();
+                            let variant_ident = field.variant_ident.as_ref().unwrap().to_string();
                             let typ = &field.ty;
                             quote! {
                                 _gluon_base::types::Field {
-                                    name: _gluon_base::symbol::Symbol::from(#ident),
+                                    name: _gluon_base::symbol::Symbol::from(#variant_ident),
                                     typ: <#typ as _gluon_api::VmType>::make_type(vm),
                                 }
                             }
                         });
                         quote! {{
-                            let ctor_name = _gluon_base::symbol::Symbol::from(#ident);
+                            let ctor_name = _gluon_base::symbol::Symbol::from(#variant_ident);
                             let typ = _gluon_base::types::Type::record(
                                 vec![],
                                 vec![#(#fields),*],
@@ -105,7 +105,7 @@ fn gen_impl(container: &Container, ident: Ident, generics: Generics, data: &Data
                             }
                         });
                         quote! {{
-                            let ctor_name = _gluon_base::symbol::Symbol::from(#ident);
+                            let ctor_name = _gluon_base::symbol::Symbol::from(#variant_ident);
                             _gluon_base::types::Field::ctor(
                                 ctor_name,
                                 vec![#(#args),*],
@@ -113,9 +113,14 @@ fn gen_impl(container: &Container, ident: Ident, generics: Generics, data: &Data
                         }}
                     }
                     Fields::Unit => quote! {{
-                        let ctor_name = _gluon_base::symbol::Symbol::from(#ident);
+                        let ctor_name = _gluon_base::symbol::Symbol::from(#variant_ident);
                         _gluon_base::types::Field::ctor(
-                            ctor_name, vec![],
+                            _gluon_base::ast::TypedIdent {
+                                name: _gluon_base::symbol::Symbol::from(#ident),
+                                typ: vm.global_env().type_cache().kind_cache.typ(),
+                            },
+                            ctor_name,
+                            vec![],
                         )
                     }},
                 }

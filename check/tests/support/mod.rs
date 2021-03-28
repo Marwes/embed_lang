@@ -7,7 +7,7 @@ extern crate gluon_parser as parser;
 
 use self::{
     base::{
-        ast::{DisplayEnv, Expr, IdentEnv, KindedIdent, RootExpr, SpannedExpr},
+        ast::{DisplayEnv, Expr, IdentEnv, KindedIdent, RootExpr, SpannedExpr, TypedIdent},
         error::{Errors, InFile},
         kind::{ArcKind, Kind, KindEnv},
         metadata::{Metadata, MetadataEnv},
@@ -342,9 +342,16 @@ pub fn alias_implicit(s: &str, args: &[&str], typ: ArcType, is_implicit: bool) -
     )
 }
 
-pub fn variant(arg: &str, types: &[ArcType]) -> Field<Symbol, ArcType> {
+pub fn variant(enum_type: &str, arg: &str, types: &[ArcType]) -> Field<Symbol, ArcType> {
     let arg = intern_unscoped(arg);
-    Field::ctor(arg, types.iter().cloned())
+    Field::ctor(
+        TypedIdent {
+            name: intern_unscoped(enum_type),
+            typ: Kind::typ(),
+        },
+        arg,
+        types.iter().cloned(),
+    )
 }
 
 pub fn alias_variant(s: &str, params: &[&str], args: &[(&str, &[ArcType])]) -> ArcType {
@@ -359,7 +366,7 @@ pub fn alias_variant_implicit(
 ) -> ArcType {
     let variants = Type::variant(
         args.iter()
-            .map(|(arg, types)| variant(arg, types))
+            .map(|(arg, types)| variant(s, arg, types))
             .collect(),
     );
     alias_implicit(s, params, variants, is_implicit)

@@ -472,6 +472,7 @@ pub fn line_comment(s: &str) -> Metadata {
 
 pub fn variant<'ast, Id>(
     mut arena: ast::ArenaRef<'_, 'ast, Id>,
+    enum_type: &str,
     arg: &str,
     types: impl IntoIterator<
         Item = AstType<'ast, Id>,
@@ -483,6 +484,10 @@ where
 {
     Field::ctor_with(
         &mut arena,
+        TypedIdent {
+            name: enum_type.into(),
+            typ: Kind::typ(),
+        },
         pos::spanned(Default::default(), arg.into()),
         types,
     )
@@ -508,7 +513,7 @@ where
     let variants = arena.clone().variant(
         arena.alloc_extend(
             args.into_iter()
-                .map(|(arg, types)| variant(arena, arg, types))
+                .map(|(arg, types)| variant(arena, s, arg, types))
                 .collect::<Vec<_>>(),
         ),
     );

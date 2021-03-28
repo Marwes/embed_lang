@@ -2,8 +2,11 @@
 //!
 //! _This module requires Gluon to be built with the `serde` feature._
 
-use crate::base::symbol::{Symbol, Symbols};
-use crate::base::types::{ArcType, Field, Type, TypeCache, TypeExt};
+use crate::base::{
+    ast::TypedIdent,
+    symbol::{Symbol, Symbols},
+    types::{ArcType, Field, Type, TypeCache, TypeExt},
+};
 
 use crate::api::VmType;
 use crate::thread::Thread;
@@ -521,6 +524,10 @@ impl<'de, 'a> VariantAccess<'de> for Enum<'a, 'de> {
 
     fn unit_variant(self) -> Result<()> {
         self.de.variant = Some(Field::ctor(
+            TypedIdent {
+                name: self.de.state.symbols.simple_symbol(self.de.name),
+                typ: self.de.state.cache.kind_cache.typ(),
+            },
             self.de.state.symbols.simple_symbol(self.variant),
             vec![],
         ));
@@ -533,6 +540,10 @@ impl<'de, 'a> VariantAccess<'de> for Enum<'a, 'de> {
     {
         let value = seed.deserialize(&mut *self.de)?;
         self.de.variant = Some(Field::ctor(
+            TypedIdent {
+                name: self.de.state.symbols.simple_symbol(self.de.name),
+                typ: self.de.state.cache.kind_cache.typ(),
+            },
             self.de.state.symbols.simple_symbol(self.variant),
             vec![self.de.typ.take().expect("typ")],
         ));
@@ -551,6 +562,10 @@ impl<'de, 'a> VariantAccess<'de> for Enum<'a, 'de> {
             )
         };
         self.de.variant = Some(Field::ctor(
+            TypedIdent {
+                name: self.de.state.symbols.simple_symbol(self.de.name),
+                typ: self.de.state.cache.kind_cache.typ(),
+            },
             self.de.state.symbols.simple_symbol(self.variant),
             types,
         ));
@@ -569,6 +584,10 @@ impl<'de, 'a> VariantAccess<'de> for Enum<'a, 'de> {
             )
         };
         self.de.variant = Some(Field::ctor(
+            TypedIdent {
+                name: self.de.state.symbols.simple_symbol(self.de.name),
+                typ: self.de.state.cache.kind_cache.typ(),
+            },
             self.de.state.symbols.simple_symbol(self.variant),
             vec![self.de.state.cache.record(vec![], types)],
         ));
@@ -581,6 +600,8 @@ mod tests {
     use super::from_rust_with_symbols;
     use super::*;
     use crate::thread::RootedThread;
+
+    use base::kind::Kind;
 
     #[allow(dead_code)]
     #[derive(Deserialize)]
@@ -622,16 +643,26 @@ mod tests {
         let (name, typ) =
             from_rust_with_symbols::<Enum>(&mut symbols, &RootedThread::new()).unwrap();
         assert_eq!(name.declared_name(), "Enum");
+        let enum_ident = TypedIdent {
+            name: symbols.simple_symbol("Enum"),
+            typ: Kind::typ(),
+        };
         assert_eq!(
             typ,
             Type::variant(vec![
-                Field::ctor(symbols.simple_symbol("A"), vec![]),
-                Field::ctor(symbols.simple_symbol("B"), vec![Type::int()]),
+                Field::ctor(enum_ident.clone(), symbols.simple_symbol("A"), vec![]),
                 Field::ctor(
+                    enum_ident.clone(),
+                    symbols.simple_symbol("B"),
+                    vec![Type::int()]
+                ),
+                Field::ctor(
+                    enum_ident.clone(),
                     symbols.simple_symbol("C"),
                     vec![Type::string(), Type::float()],
                 ),
                 Field::ctor(
+                    enum_ident,
                     symbols.simple_symbol("D"),
                     vec![Type::record(
                         vec![],

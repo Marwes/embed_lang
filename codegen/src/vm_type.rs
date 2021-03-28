@@ -51,6 +51,10 @@ fn gen_impl(container: &Container, ident: Ident, generics: Generics, data: &Data
         },
     };
 
+    // Enums create symbols so we need to cache the created typ or multiple invocations will return
+    // different types
+    let mut is_enum = false;
+
     let make_type_impl = match container.vm_type {
         Some(ref gluon_type) => {
             let type_application = gen_type_application(&generics);
@@ -101,27 +105,32 @@ fn gen_impl(container: &Container, ident: Ident, generics: Generics, data: &Data
                 Fields::Unit => quote!(_gluon_base::types::Type::unit()),
             },
             Data::Enum(ref enum_) => {
+                is_enum = true;
                 let variants = enum_.variants.iter().map(|variant| {
-                    let ident = variant.ident.to_string();
+                    let variant_ident = variant.ident.to_string();
                     match variant.fields {
                         Fields::Named(ref fields) => {
                             let fields = fields.named.iter().map(|field| {
-                                let ident = field.ident.as_ref().unwrap().to_string();
+                                let variant_ident = field.ident.as_ref().unwrap().to_string();
                                 let typ = &field.ty;
                                 quote! {
                                     _gluon_base::types::Field {
-                                        name: _gluon_base::symbol::Symbol::from(#ident),
+                                        name: _gluon_base::symbol::Symbol::from(#variant_ident),
                                         typ: <#typ as _gluon_api::VmType>::make_type(vm),
                                     }
                                 }
                             });
                             quote! {{
-                                let ctor_name = _gluon_base::symbol::Symbol::from(#ident);
+                                let ctor_name = _gluon_base::symbol::Symbol::from(#variant_ident);
                                 let typ = _gluon_base::types::Type::record(
                                     vec![],
                                     vec![#(#fields),*],
                                 );
                                 _gluon_base::types::Field::ctor(
+                                    _gluon_base::ast::TypedIdent {
+                                        name: type_name.clone(),
+                                        typ: vm.global_env().type_cache().kind_cache.typ()
+                                    },
                                     ctor_name,
                                     vec![typ],
                                 )
@@ -135,17 +144,26 @@ fn gen_impl(container: &Container, ident: Ident, generics: Generics, data: &Data
                                 }
                             });
                             quote! {{
-                                let ctor_name = _gluon_base::symbol::Symbol::from(#ident);
+                                let ctor_name = _gluon_base::symbol::Symbol::from(#variant_ident);
                                 _gluon_base::types::Field::ctor(
+                                    _gluon_base::ast::TypedIdent {
+                                        name: type_name.clone(),
+                                        typ: vm.global_env().type_cache().kind_cache.typ()
+                                    },
                                     ctor_name,
                                     vec![#(#args),*],
                                 )
                             }}
                         }
                         Fields::Unit => quote! {{
-                            let ctor_name = _gluon_base::symbol::Symbol::from(#ident);
+                            let ctor_name = _gluon_base::symbol::Symbol::from(#variant_ident);
                             _gluon_base::types::Field::ctor(
-                                ctor_name, vec![],
+                                _gluon_base::ast::TypedIdent {
+                                    name: type_name.clone(),
+                                    typ: vm.global_env().type_cache().kind_cache.typ()
+                                },
+                                ctor_name,
+                                vec![],
                             )
                         }},
                     }
@@ -173,12 +191,15 @@ fn gen_impl(container: &Container, ident: Ident, generics: Generics, data: &Data
 
     let dummy_const = Ident::new(&format!("_IMPL_VM_TYPE_FOR_{}", ident), Span::call_site());
 
-    let make_type_impl = if container.newtype {
+    let make_type_impl = if container.newtype || is_enum {
         let type_application = gen_type_application(&generics);
         let generic_params = map_type_params(&generics, |param| {
             let lower_param = param.to_string().to_ascii_lowercase();
             quote! {
-                vm.global_env().get_generic(#lower_param)
+                match *vm.global_env().get_generic(#lower_param) {
+                    _gluon_base::types::Type::Generic(ref gen) => gen.clone(),
+                    _ => unreachable!(),
+                }
             }
         });
 
@@ -186,8 +207,9 @@ fn gen_impl(container: &Container, ident: Ident, generics: Generics, data: &Data
             let ty = if let Some(ty) = vm.get_cache_alias(stringify!(#ident)) {
                 ty
             } else {
+                let type_name = _gluon_base::symbol::Symbol::from(stringify!(#ident));
                 let ty = _gluon_base::types::Alias::new(
-                    _gluon_base::symbol::Symbol::from(stringify!(#ident)),
+                    type_name.clone(),
                     vec![#(#generic_params),*],
                     #make_type_impl,
                 );
