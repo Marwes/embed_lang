@@ -1,0 +1,266 @@
+let { id } = import! std.function
+
+let statet @ { StateT } = import! std.statet
+
+
+type Streamer a srm = StateT srm Option a
+
+#[implicit]
+type Streamlike a srm = {
+    uncons : Streamer a srm
+}
+
+let uncons ?sl : [Streamlike a srm] -> Streamer a srm =
+    sl.uncons
+
+let next srm : [Streamlike a srm] -> srm -> Option a =
+    map fst (uncons srm)
+
+let take n xs : [Streamlike a srm] -> Int -> srm -> ? =
+    if n > 0 then
+        match uncons xs with
+        | Some (x, xs') -> Some {value = x, state = (take (n - 1) xs')}
+        | None -> empty
+    else empty
+
+let semigroup : [Streamlike a srm] -> Semigroup srm =
+    let append xs ys =
+        match uncons xs with
+        | Some (x, xs') -> Some {value = x, state = append xs' ys}
+        | None -> ys
+
+    { append }
+
+let monoid : [Streamlike a srm] -> Monoid srm =
+    { semigroup, empty }
+
+// StateT strict version
+#[implicit]
+type Streamlike a srm = {
+    uncons : srm -> Option (StateOut srm a)
+}
+
+
+// state-machine adapters
+type Unfold acc = {
+    f : acc -> Option acc,
+    acc : acc
+}
+
+let unfold_streamlike : Streamlike acc (Unfold acc) =
+    let uncons unfold =
+        unfold.f unfold.acc |> map (\acc' ->
+            {value = acc', state = {f = unfold.f, acc = acc'}})
+    { uncons }
+
+let unfold f acc : (acc -> Option acc) -> acc -> Unfold acc =
+    {f , acc}
+
+// replaced with FilterMap
+/* // FIXME this seems wrong. Maybe leave mapping to stream processors somehow? */
+/* type MapSrm a b srm = { */
+/*     f : a -> b, */
+/*     xs : srm */
+/* } */
+
+/* let mapsrm_streamlike : [Streamlike a srm] -> Streamlike b (MapSrm a b srm) = */
+/*     let uncons mapsrm = */
+/*         uncons mapsrm.xs |> map \{value = x, state = xs'} */
+/*             {value = mapsrm.f x, state = {f = mapsrm.f, xs = xs'}} */
+/*     { uncons } */
+
+/* let map_srm f xs : (a -> b) -> srm -> MapSrm a b srm = */
+/*     {f, xs} */
+
+type FilterMap a b srm = {
+    pred : a -> Option b,
+    xs : srm
+}
+
+// FIXME Will not halt if fed an infinite stream of elements that fail the predicate
+let filter_map_streamlike : [Streamlike a srm] -> Streamlike b (FilterMap a b srm) =
+    rec let uncons filtermp =
+        uncons filtermp.xs |> map (\sout ->
+            let {value = x, state = xs'} = sout
+            match filtermp.pred x with
+            | Some x' -> {value = x', state = {pred = filtermp.pred, xs = xs'}}
+            | None -> uncons {pred = filtermp.pred, xs = xs'})
+
+let filter_map pred xs : [Streamlike a srm] -> (a -> Option b) -> srm -> FilterMap a b srm =
+    {pred, xs}
+
+// replaced with FilterMap
+/* // TODO Is it a problem for Filter and TakeWhile to have the same type signature/definition? */
+/* type Filter a srm = { */
+/*     pred : a -> Bool, */
+/*     xs : srm */
+/* } */
+
+/* // FIXME Will not halt if fed an infinite stream of elements that fail the predicate */
+/* let filter_streamlike : [Streamlike a srm] -> Streamlike a (Filter a srm) = */
+/*     rec let uncons filter = */
+/*         uncons filter.xs |> map \{value = Some x, state = xs'} -> */
+/*             if filter.pred x then */
+/*                 {value = x, state = {pred = filter.pred, xs = xs'}} */
+/*             else */
+/*                 uncons {pred = filter.pred, xs = xs'} */
+
+/* let filter pred xs : [Streamlike a srm] -> (a -> Bool) -> srm -> Filter a srm = */
+/*     {pred, xs} */
+
+/* type TakeWhile a srm = { */
+/*     pred : a -> Bool, */
+/*     xs : srm */
+/* } */
+
+/* let take_while_streamlike : [Streamlike a srm] -> Streamlike a (TakeWhile srm) = */
+/*     let uncons tw = */
+/*         uncons tw.xs >>= \sout -> */
+/*             let {value = x, state = xs'} = sout */
+/*             if tw.pred x then */
+/*                 Some {value = x, state = {pred = tw.pred, xs = xs'}} */
+/*             else */
+/*                 None */
+
+/*     { uncons } */
+
+/* let take_while pred xs : [Streamlike a srm] -> (a -> Bool) -> srm -> TakeWhile a srm = */
+/*     {pred, xs} */
+
+type TakeWhileMap a b srm = {
+    pred : a -> Option b,
+    xs : srm
+}
+
+let take_while_map_streamlike : [Streamlike a srm] -> Streamlike b (TakeWhileMap a b srm) =
+    let uncons tw =
+        uncons tw.xs >>= \sout ->
+            let {value = x, state = xs'} = sout
+            tw.pred x |> map (\x' ->
+                {value = x', state = {pred = tw.pred, xs = xs'}})
+
+    { uncons }
+
+let take_while_map pred xs : [Streamlike a srm] -> (a -> Option b) -> srm -> TakeWhileMap a b srm =
+    {pred, xs}
+
+// replaced with composition of Unfold and ZipWith
+/* type Take srm = { */
+/*     count : Int, */
+/*     xs : srm */
+/* } */
+
+/* let take_streamlike : [Streamlike a srm] -> Streamlike a (Take srm) = */
+/*     let uncons take = */
+/*         if take.count > 0 then */
+/*             uncons take.xs |> map (\sout -> */
+/*                 let {value = x, state = xs'} = sout */
+/*                 {value = x, state = {count = take.count - 1, xs = xs'}}) */
+/*         else */
+/*             None */
+/*     { uncons } */
+
+/* let take n xs : [Streamlike a srm] -> Int -> srm -> Take srm = */
+/*     {count = n, xs} */
+
+type ZipWith a b c srma srmb = {
+    f : (a -> b -> c),
+    xs : srma,
+    ys : srmb
+}
+
+let zip_with_streamlike : [Streamlike a srma] -> [Streamlike b srmb] -> Streamlike c (ZipWith a b c srma srmb) =
+    let uncons zipw = match (uncons zipw.xs, uncons zipw.ys) with
+        | (Some {value = x, state = xs'}, Some {value = y, state = ys'}) ->
+            Some {value = zipw.f x y, state = {f = zipw.f, xs = xs', ys = ys'}},
+        | _ -> None
+    { uncons }
+
+let zip_with f xs ys : [Streamlike a srma] -> [Streamlike b srmb] -> (a -> b -> c) -> srma -> srmb -> ZipWith a b c srma srmb =
+    {f, xs, ys}
+
+// rewrite as composition of Unfold and MapSrm?
+type Scan acc a srm = {
+    f : acc -> a -> Option acc,
+    acc : acc,
+    xs : srm
+}
+
+let scan_streamlike : [Streamlike a srm] -> Streamlike (Scan acc a srm) =
+    let uncons scan =
+        uncons scan.xs >>= \sout ->
+            let {value = x, state = xs'} = sout
+            scan.f scan.acc x |> map (\acc' ->
+                {value = acc', state = {f = scan.f, acc = acc', xs = xs'}})
+    { uncons }
+
+let scan f acc xs : [Streamlike a srm] -> (acc -> a -> acc) -> acc -> srm -> Scan acc a srm =
+    {f, acc, xs}
+
+type Flatten srm srms : {
+    xs : srm,
+    xss : srms
+}
+
+// FIXME Will not halt if fed an infinite stream of empties
+let flatten_streamlike : [Streamlike a srm] -> [Streamlike srm srms] -> Streamlike a (Flatten srm srms) =
+    rec let uncons flatten = match uncons flatten.xs with
+    | Some {value = x, state = xs'} ->
+        Some {value = x, state = {xs = xs', xss = flatten.xss}}
+    | None ->
+        uncons flatten.xss |> map (\sout ->
+            let {value = xs, state = xss'} = sout
+            uncons {xs, xss = xss'})
+
+    { uncons }
+
+let flatten srms : [Streamlike a srm] -> [Streamlike srm srms] -> srms -> Flatten srm srms =
+    {xs = empty, xss = srms}
+
+
+
+let count_from start : Int -> Unfold Int =
+    {f = (+) 1, acc = start}
+
+let count_from_by start step : Int -> Int -> Unfold Int =
+    {f = (+) step, acc = start}
+
+let take_while pred = take_while_map <| \x -> if pred x then Some x else None
+
+let take n = count_from 0 |> take_while ((>) n) |> zip_with (\_ x -> x)
+
+let repeat x : a -> Unfold a =
+    {f = Some, acc = x}
+
+let repeat_n n = take n << repeat
+    /* {f = \x _ -> Some x, */
+    /*  acc = x, */
+    /*  xs = count_from 0 |> take_while ((>) n)} */
+
+let map_srm f = filter_map (f >> Some)
+
+let filter pred = filter_map <| \x -> if pred x then Some x else None
+
+let cycle : [Streamlike a srm] -> srm -> Flatten srm (Unfold srm) =
+    flatten << repeat
+
+let cycle_n n = flatten << repeat_n n
+
+let zip = zip_with <| \xs ys -> (xs, ys)
+
+/* let unfold f acc = scan (|>) acc (repeat f) */
+
+// TODO test
+/* let scan f acc = */
+/*     let unf acc = */ 
+/*         uncons acc.state |> map (f acc.value) */
+/*     uncons >> unfold unf >> map_srm .value */
+
+
+// drop
+// drop_while
+// show?
+// singleton?
+// intercalate?
+// group/chunks_of?
+// split_at?
