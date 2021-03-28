@@ -1,0 +1,44 @@
+let { Functor, map } = import! std.functor
+let const @ { Const, ? } = import! std.functor.const
+let identity = import! std.identity
+
+
+type Lens s t a b = { app : forall f . [Functor f] -> (a -> f b) -> s -> f t }
+
+
+type Lens' s a = Lens s s a a
+
+
+let view lens x : Lens s t a b -> s -> a =
+    let res = lens.app const.app x
+    res.value
+
+
+let over lens f y : Lens s t a b -> (a -> b) -> s -> t =
+    lens.app ?identity.functor (\x -> (f x)) y
+
+
+let set lens x : Lens s t a b -> b -> s -> t = over lens (\_ -> x)
+
+
+let make view set : (s -> a) -> (b -> s -> t) -> Lens s t a b =
+    {
+        app = \k x -> map (\y -> set y x) (k (view x)),
+    }
+
+
+#[infix(right, 8)]
+let (^) g f : Lens j k s t -> Lens s t a b -> Lens j k a b = {
+    app = \k -> g.app (f.app k),
+}
+
+
+#[infix(left, 1)]
+let (&) x g : a -> (a -> b) -> b = g x
+
+
+#[infix(right, 9)]
+let (^.) x lens : s -> Lens s t a b -> a = view lens x
+
+
+{ Lens, Lens', view, set, over, make, (^), (&), (^.) }

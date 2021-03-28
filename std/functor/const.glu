@@ -1,0 +1,27 @@
+let { Functor } = import! std.functor
+
+let { Applicative } = import! std.applicative
+
+let { Monoid, empty } = import! std.monoid
+
+let { (<>) } = import! std.semigroup
+
+type Const s a = { value : s }
+
+#[implicit]
+let functor : forall s . Functor (Const s) = {
+    map = \f -> \c -> { value = c.value },
+}
+
+#[implicit]
+let applicative : forall s . [Monoid s] -> Applicative (Const s) = {
+    functor,
+    apply = \f x -> { value = f.value <> x.value },
+    wrap = \_ -> { value = empty }
+}
+
+let app : s -> Const s a = \value -> { value }
+
+let run : Const s a -> s = \c -> c.value
+
+{ Const, functor, app, run }
